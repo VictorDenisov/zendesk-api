@@ -14,10 +14,36 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  hs-source-dirs:      src
   exposed-modules:     Zendesk
-  -- other-modules:
+  other-modules:       Json
   -- other-extensions:
-  build-depends:       base >=4.5 && <4.6
-  -- hs-source-dirs:
+  build-depends:       aeson == 0.7.*
+                     , base >=4.5 && <4.7
+                     , bytestring == 0.10.0.2
+                     , case-insensitive == 1.1.0.3
+                     , connection == 0.2.*
+                     , data-default == 0.5.*
+                     , failure == 0.2.*
+                     , http-client == 0.2.*
+                     , http-client-tls == 0.2.*
+                     , http-conduit == 2.0.0.3
+                     , http-types == 0.8.3
+                     , monad-logger == 0.3.*
+                     , mtl == 2.1.2
+                     , pem == 0.2.*
+                     , text >= 0.11.3
+                     , template-haskell == 2.8.0.0
+                     , tls == 1.2.*
+                     , transformers == 0.3.0.0
+                     , x509 == 1.4.*
+                     , x509-store == 1.4.*
+                     , x509-validation == 1.5.*
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+executable Test
+  main-is:             Main.hs
+  build-depends:       base >=4.6 && <4.7
+                     , zendesk-api == 0.1.0.0
+                     , monad-logger == 0.3.*
   default-language:    Haskell2010
