@@ -7,7 +7,7 @@ main = do
             (ZendeskConfig
                 "https://sample.zendesk.com"
                 "sampleUser"
-                "samplePasssword" 
-                Nothing) 
+                "samplePasssword"
+                Nothing)
           $ createUser (Name "testUser") (Email "testEmail@gmail.com")
   putStrLn $ show us
