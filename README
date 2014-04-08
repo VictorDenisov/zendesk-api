@@ -1,0 +1,25 @@
+How to test this library.
+
+You need to have a file ZendeskConfig.hs with the following content:
+
+module ZendeskConfig where
+
+import Zendesk
+import Control.Monad.Logger
+
+rz f = runStdoutLoggingT $ runZendeskT (
+                              ZendeskConfig
+                                "https://domain.zendesk.com"
+                                "username" -- if it's token then username/token
+                                "password" -- this is token if you use token
+                                Nothing)
+                           f
+
+Then run 
+# cabal repl
+
+Prelude > :load ZendeskConfig.hs
+
+and you can invoke commands from interactive shell like this:
+
+rz $ listUsers
