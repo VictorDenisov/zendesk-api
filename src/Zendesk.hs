@@ -12,7 +12,7 @@
 module Zendesk
 where
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 import Control.Exception (catches, SomeException(..), Handler(..))
 import Control.Failure (Failure(..))
 import Control.Monad (liftM)
@@ -20,7 +20,7 @@ import Control.Monad.Reader (ReaderT (..), asks)
 import Control.Monad.Error (ErrorT (..), MonadError(..), Error(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Logger (MonadLogger(..), logDebug)
-import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=))
+import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..))
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS (toStrict)
 import Data.ByteString.Char8 as BS8 (pack, unpack)
@@ -110,9 +110,19 @@ data User = User
   , userVerified        :: Maybe Bool
   } deriving (Show)
 
-data Users = Users
-  { usersUsers :: [User]
-  } deriving (Show)
+data Collection e = Collection
+  { collectionElements :: [e]
+  , collectionCount :: Int
+  , collectionNextPage :: Maybe Text
+  , collectionPrevPage :: Maybe Text
+  } deriving Show
+
+instance FromJSON (Collection User) where
+  parseJSON (Object v) = Collection
+                          <$> v .: "users"
+                          <*> v .: "count"
+                          <*> v .: "next_page"
+                          <*> v .: "previous_page"
 
 data UserReply = UserReply
   { userReplyUser :: User
@@ -124,7 +134,6 @@ data CreateUserRequest = CreateUserRequest
   } deriving (Show)
 
 deriveJSON ''User
-deriveJSON ''Users
 deriveJSON ''UserReply
 deriveJSON ''CreateUserRequest
 
@@ -189,7 +198,7 @@ runRequest request = do
   password <- BS8.pack `liftM` (asks zendeskPassword)
   let request' = applyBasicAuth username password $ request { checkStatus = \_ _ _ -> Nothing }
 
-  $logDebug $ T.pack $ "Sending request to proviant: " ++ (showRequest request')
+  $logDebug $ T.pack $ "Sending request to zendesk: " ++ (showRequest request')
 
   mTLSConfig <- asks zendeskTLS
   let tlsSettings = case mTLSConfig of
@@ -219,7 +228,7 @@ runRequest request = do
   response <- handleExceptionsAndResult $ do
     withManagerSettings httpSettings $ httpLbs request'
 
-  $logDebug $ T.pack $ "Got response from proviant: " ++ (showResponse response)
+  $logDebug $ T.pack $ "Got response from zendesk: " ++ (showResponse response)
 
   result <- decodeResponseBody response
   case result of
@@ -247,8 +256,8 @@ createUser (Name name) (Email email) = do
                 }
   userReplyUser `liftM` (runRequest request)
 
-listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m [User]
-listUsers = usersUsers `liftM` (runRequestTo =<< getUsersUrl)
+listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
+listUsers = runRequestTo =<< getUsersUrl
 
 data None = None
   deriving (Show, Eq)
