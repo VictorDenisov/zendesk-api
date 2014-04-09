@@ -26,6 +26,7 @@ import qualified Data.ByteString.Lazy as LBS (toStrict)
 import Data.ByteString.Char8 as BS8 (pack, unpack)
 import Data.CaseInsensitive (mk)
 import Data.Default (Default(..))
+import qualified Data.HashMap.Strict as M
 import Data.Int (Int64)
 import Data.PEM (PEM(..), pemParseBS)
 import Data.Text as T (pack, Text, unpack)
@@ -117,12 +118,16 @@ data Collection e = Collection
   , collectionPrevPage :: Maybe Text
   } deriving Show
 
-instance FromJSON (Collection User) where
-  parseJSON (Object v) = Collection
-                          <$> v .: "users"
-                          <*> v .: "count"
-                          <*> v .: "next_page"
-                          <*> v .: "previous_page"
+instance (FromJSON e) => FromJSON (Collection e) where
+  parseJSON (Object v) = do
+    let k = head $ filter f $ M.keys v
+    Collection
+          <$> v .: k
+          <*> v .: "count"
+          <*> v .: "next_page"
+          <*> v .: "previous_page"
+    where
+      f s = not $ s `elem` ["count", "next_page", "previous_page"]
 
 data UserReply = UserReply
   { userReplyUser :: User
@@ -156,10 +161,10 @@ showResponse x = unlines
   , "}"
   ]
 
-
 errorResponseText :: HTTP.Response ByteString -> String
 errorResponseText response =
   either (\_ -> show $ responseBody response) errorReportError $ eitherDecode . responseBody $ response
+
 handleExceptionsAndResult :: MonadIO m => IO a -> ZendeskT m a
 handleExceptionsAndResult monad = do
   res <- liftIO $ (fmap Right monad) `catches` [ Handler handleHttpException
@@ -168,6 +173,7 @@ handleExceptionsAndResult monad = do
   case res of
     Left v -> throwError v
     Right x -> return x
+
 decodeResponseBody :: (Monad m, ParseResponseBody a)
                    => Response ByteString -> m (Either ZendeskError a)
 decodeResponseBody response
@@ -181,7 +187,6 @@ decodeResponseBody response
   | statusCode (responseStatus response) == 502 = return $ Left $ TimeoutError
   | statusCode (responseStatus response) `elem` [500..599] = return $ Left $ InternalError $ errorResponseText response
   | otherwise = return $ Left $ UnknownError $ errorResponseText response
-
 
 handleHttpException :: HttpException -> IO (Either ZendeskError a)
 handleHttpException ResponseTimeout = return $ Left TimeoutError
@@ -259,11 +264,11 @@ createUser (Name name) (Email email) = do
 listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
 listUsers = runRequestTo =<< getUsersUrl
 
-nextPage :: (MonadIO m, MonadLogger m)
+nextPage :: (MonadIO m, MonadLogger m, FromJSON e)
          => Collection e -> ZendeskT m (Maybe (Collection e))
 nextPage (Collection _ _ npage _) = case npage of
   Nothing -> return Nothing
-  Just np -> Just <$> (runRequestTo $ T.unpack np)
+  Just np -> Just `liftM` (runRequestTo $ T.unpack np)
 
 data None = None
   deriving (Show, Eq)
