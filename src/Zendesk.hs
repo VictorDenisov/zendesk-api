@@ -259,6 +259,12 @@ createUser (Name name) (Email email) = do
 listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
 listUsers = runRequestTo =<< getUsersUrl
 
+nextPage :: (MonadIO m, MonadLogger m)
+         => Collection e -> ZendeskT m (Maybe (Collection e))
+nextPage (Collection _ _ npage _) = case npage of
+  Nothing -> return Nothing
+  Just np -> Just <$> (runRequestTo $ T.unpack np)
+
 data None = None
   deriving (Show, Eq)
 
