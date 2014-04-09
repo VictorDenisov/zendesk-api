@@ -270,6 +270,12 @@ nextPage (Collection _ _ npage _) = case npage of
   Nothing -> return Nothing
   Just np -> Just `liftM` (runRequestTo $ T.unpack np)
 
+prevPage :: (MonadIO m, MonadLogger m, FromJSON e)
+         => Collection e -> ZendeskT m (Maybe (Collection e))
+prevPage (Collection _ _ _ ppage) = case ppage of
+  Nothing -> return Nothing
+  Just pp -> Just `liftM` (runRequestTo $ T.unpack pp)
+
 data None = None
   deriving (Show, Eq)
 
