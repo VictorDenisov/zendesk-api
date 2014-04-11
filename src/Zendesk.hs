@@ -19,7 +19,7 @@ import Control.Monad (liftM)
 import Control.Monad.Reader (ReaderT (..), asks)
 import Control.Monad.Error (ErrorT (..), MonadError(..), Error(..))
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Logger (MonadLogger(..), logDebug)
+import Control.Monad.Logger (MonadLogger(..), logDebug, runStdoutLoggingT)
 import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..))
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS (toStrict)
@@ -28,6 +28,7 @@ import Data.CaseInsensitive (mk)
 import Data.Default (Default(..))
 import qualified Data.HashMap.Strict as M
 import Data.Int (Int64)
+import Data.Maybe (fromJust)
 import Data.PEM (PEM(..), pemParseBS)
 import Data.Text as T (pack, Text, unpack)
 import Data.Text.Encoding as T (encodeUtf8)
@@ -46,6 +47,7 @@ import Network.HTTP.Conduit as HTTP ( httpLbs, parseUrl, withManagerSettings
 import Network.HTTP.Types.Status (Status(..))
 import Network.TLS (Credential, Credentials(..), ClientParams(..), Shared(..), ClientHooks(..), Supported(..), defaultParamsClient, credentialLoadX509FromMemory)
 import Network.TLS.Extra.Cipher (ciphersuite_strong)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
 
@@ -260,6 +262,13 @@ createUser (Name name) (Email email) = do
                                   $ object ["user" .= CreateUserRequest name email]
                 }
   userReplyUser `liftM` (runRequest request)
+
+listAllUsers :: ZendeskConfig -> [User]
+listAllUsers c = let
+    p1 = fromRight $ unsafePerformIO $ runStdoutLoggingT $ runZendeskT c $ listUsers
+    p2 = fromRight $ unsafePerformIO $ runStdoutLoggingT $ runZendeskT c $ nextPage p1
+    in (collectionElements p1) ++ (collectionElements (fromJust p2))
+  where fromRight (Right x) = x
 
 listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
 listUsers = runRequestTo =<< getUsersUrl
