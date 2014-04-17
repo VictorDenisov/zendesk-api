@@ -15,11 +15,12 @@ where
 import Control.Applicative ((<$>), (<*>))
 import Control.Exception (catches, SomeException(..), Handler(..))
 import Control.Failure (Failure(..))
-import Control.Monad (liftM)
+import Control.Monad (liftM, forM)
 import Control.Monad.Reader (ReaderT (..), asks)
 import Control.Monad.Error (ErrorT (..), MonadError(..), Error(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Logger (MonadLogger(..), logDebug, runStdoutLoggingT)
+import Control.Monad.Trans (lift)
 import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..))
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS (toStrict)
@@ -50,6 +51,8 @@ import Network.TLS.Extra.Cipher (ciphersuite_strong)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
+
+import Data.Conduit (Source, yield)
 
 data ZendeskError = ApiMismatchError
                   | TimeoutError
@@ -272,6 +275,19 @@ listAllUsers c = let
 
 listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
 listUsers = runRequestTo =<< getUsersUrl
+
+getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
+getUsers = do
+  usersCollection <- lift $ runRequestTo =<< getUsersUrl
+  forM (collectionElements usersCollection) yield
+  getNextPage $ collectionNextPage usersCollection
+
+  where getNextPage :: (MonadIO m, MonadLogger m) => Maybe Text -> Source (ZendeskT m) User
+        getNextPage Nothing = return ()
+        getNextPage (Just url) = do
+             usersCollection <- lift $ runRequestTo $ T.unpack url
+             forM (collectionElements usersCollection) yield
+             getNextPage $ collectionNextPage usersCollection
 
 nextPage :: (MonadIO m, MonadLogger m, FromJSON e)
          => Collection e -> ZendeskT m (Maybe (Collection e))
