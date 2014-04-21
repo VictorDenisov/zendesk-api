@@ -114,6 +114,7 @@ data User = User
   , userPhoto           :: Maybe Attachment
   } deriving (Show)
 
+
 data Attachment = Attachment
   { attachmentId          :: Int
   , attachmentFileName    :: Text
@@ -121,6 +122,35 @@ data Attachment = Attachment
   , attachmentContentType :: Text
   , attachmentSize        :: Int
   , attachmentThumbnails  :: Maybe [Attachment]
+  } deriving (Show)
+
+data Ticket = Ticket
+  { ticketId :: Maybe Int
+  , ticketUrl :: Maybe Text
+  , ticketExternalId :: Maybe Text
+  , ticketType :: Maybe Text
+  , ticketSubject :: Maybe Text
+  , ticketDescription :: Maybe Text
+  , ticketPriority :: Maybe Text
+  , ticketStatus :: Maybe Text
+  , ticketRecipient :: Maybe Text
+  , ticketRequesterId :: Int
+  , ticketSubmitterId :: Maybe Int
+  , ticketAssigneeId :: Maybe Int
+  , ticketOrganizationId :: Maybe Int
+  , ticketGroupId :: Maybe Int
+  , ticketCollaboratorIds :: Maybe [Int]
+  , ticketForumTopicId :: Maybe Int
+  , ticketProblemId :: Maybe Int
+  , ticketHasIncidents :: Maybe Bool
+  , ticketDueAt :: Maybe Text
+  , ticketTags :: Maybe [Text]
+  , ticketVia :: Maybe Via
+  } deriving (Show)
+
+data Via = Via
+  { viaChannel :: Text
+  , viaSource  :: Maybe Text -- actually it should be object. I don't known yet what object means
   } deriving (Show)
 
 data Collection e = Collection
@@ -150,10 +180,12 @@ data CreateUserRequest = CreateUserRequest
   , createUserRequestEmail :: String
   } deriving (Show)
 
-deriveJSON ''User
 deriveJSON ''UserReply
 deriveJSON ''CreateUserRequest
+deriveJSON ''User
 deriveJSON ''Attachment
+deriveJSON ''Ticket
+deriveJSON ''Via
 
 showRequest :: Request -> String
 showRequest x = unlines
