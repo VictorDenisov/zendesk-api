@@ -11,18 +11,24 @@ module Json
 
 import Data.Aeson (FromJSON(..), ToJSON(..), Value(..))
 import qualified Data.Aeson.TH as J (Options (..), defaultOptions, deriveJSON)
-import Data.Char (toLower)
+import Data.Char (toLower, isUpper)
 import Data.Text as T (unpack)
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax (showName)
 
 jsonOptionsForPrefix :: String -> J.Options
-jsonOptionsForPrefix prefix = J.defaultOptions
-                            { J.fieldLabelModifier = lowerCaseFirst . (drop prefixLength) }
-                          where prefixLength = length prefix
-                                lowerCaseFirst :: String -> String
-                                lowerCaseFirst [] = []
-                                lowerCaseFirst (c:cs) = (toLower c) : cs
+jsonOptionsForPrefix prefix =
+  J.defaultOptions
+    { J.fieldLabelModifier = underscoreIt . (drop $ length prefix) }
+
+underscoreIt :: String -> String
+underscoreIt s = go [] s
+  where
+    go :: String -> String -> String
+    go [] (c:cs) = go [toLower c] cs
+    go r (c:cs) | isUpper c = go (r ++ "_" ++ [(toLower c)]) cs
+    go r (c:cs) = go (r ++ [c]) cs
+    go r [] = r
 
 deriveJSONOptions :: J.Options -> Name -> Q [Dec]
 deriveJSONOptions = J.deriveJSON

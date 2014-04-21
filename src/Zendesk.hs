@@ -101,21 +101,31 @@ data User = User
   { userId              :: Maybe Int
   , userUrl             :: Maybe Text
   , userName            :: Text
-  , userCreated_at      :: Maybe Text
-  , userUpdated_at      :: Maybe Text
-  , userTime_zone       :: Maybe Text
+  , userCreatedAt       :: Maybe Text
+  , userUpdatedAt       :: Maybe Text
+  , userTimeZone        :: Maybe Text
   , userEmail           :: Text
   , userPhone           :: Maybe Text
   , userLocale          :: Maybe Text
-  , userLocale_id       :: Maybe Int
-  , userOrganization_id :: Maybe Int
+  , userLocaleId        :: Maybe Int
+  , userOrganizationId  :: Maybe Int
   , userRole            :: Text
   , userVerified        :: Maybe Bool
+  , userPhoto           :: Maybe Attachment
+  } deriving (Show)
+
+data Attachment = Attachment
+  { attachmentId          :: Int
+  , attachmentFileName    :: Text
+  , attachmentContentUrl  :: Text
+  , attachmentContentType :: Text
+  , attachmentSize        :: Int
+  , attachmentThumbnails  :: Maybe [Attachment]
   } deriving (Show)
 
 data Collection e = Collection
   { collectionElements :: [e]
-  , collectionCount :: Int
+  , collectionCount    :: Int
   , collectionNextPage :: Maybe Text
   , collectionPrevPage :: Maybe Text
   } deriving Show
@@ -143,6 +153,7 @@ data CreateUserRequest = CreateUserRequest
 deriveJSON ''User
 deriveJSON ''UserReply
 deriveJSON ''CreateUserRequest
+deriveJSON ''Attachment
 
 showRequest :: Request -> String
 showRequest x = unlines
@@ -275,7 +286,6 @@ getUsers =
              usersCollection <- lift $ runRequestTo $ T.unpack url
              forM (collectionElements usersCollection) yield
              go $ collectionNextPage usersCollection
-
 
 data None = None
   deriving (Show, Eq)
