@@ -48,7 +48,6 @@ import Network.HTTP.Conduit as HTTP ( httpLbs, parseUrl, withManagerSettings
 import Network.HTTP.Types.Status (Status(..))
 import Network.TLS (Credential, Credentials(..), ClientParams(..), Shared(..), ClientHooks(..), Supported(..), defaultParamsClient, credentialLoadX509FromMemory)
 import Network.TLS.Extra.Cipher (ciphersuite_strong)
-import System.IO.Unsafe (unsafePerformIO)
 
 import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
 
@@ -266,16 +265,6 @@ createUser (Name name) (Email email) = do
                 }
   userReplyUser `liftM` (runRequest request)
 
-listAllUsers :: ZendeskConfig -> [User]
-listAllUsers c = let
-    p1 = fromRight $ unsafePerformIO $ runStdoutLoggingT $ runZendeskT c $ listUsers
-    p2 = fromRight $ unsafePerformIO $ runStdoutLoggingT $ runZendeskT c $ nextPage p1
-    in (collectionElements p1) ++ (collectionElements (fromJust p2))
-  where fromRight (Right x) = x
-
-listUsers :: (MonadIO m, MonadLogger m) => ZendeskT m (Collection User)
-listUsers = runRequestTo =<< getUsersUrl
-
 getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
 getUsers = do
   usersCollection <- lift $ runRequestTo =<< getUsersUrl
@@ -288,18 +277,6 @@ getUsers = do
              usersCollection <- lift $ runRequestTo $ T.unpack url
              forM (collectionElements usersCollection) yield
              getNextPage $ collectionNextPage usersCollection
-
-nextPage :: (MonadIO m, MonadLogger m, FromJSON e)
-         => Collection e -> ZendeskT m (Maybe (Collection e))
-nextPage (Collection _ _ npage _) = case npage of
-  Nothing -> return Nothing
-  Just np -> Just `liftM` (runRequestTo $ T.unpack np)
-
-prevPage :: (MonadIO m, MonadLogger m, FromJSON e)
-         => Collection e -> ZendeskT m (Maybe (Collection e))
-prevPage (Collection _ _ _ ppage) = case ppage of
-  Nothing -> return Nothing
-  Just pp -> Just `liftM` (runRequestTo $ T.unpack pp)
 
 data None = None
   deriving (Show, Eq)
