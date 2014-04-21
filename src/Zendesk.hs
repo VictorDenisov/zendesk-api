@@ -53,8 +53,7 @@ import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
 
 import Data.Conduit (Source, yield)
 
-data ZendeskError = ApiMismatchError
-                  | TimeoutError
+data ZendeskError = TimeoutError
                   | NoResourceError
                   | BadRequestError String
                   | NoFreeServersError String
@@ -65,7 +64,6 @@ instance Error ZendeskError where
   strMsg = UnknownError
 
 instance Show ZendeskError where
-  show ApiMismatchError  = "Proviant API version does not match"
   show NoResourceError   = "Resource not found in datacenter"
   show TimeoutError      = "Datacenter unavailable"
   show (BadRequestError s)      = "Bad request: " ++ s
