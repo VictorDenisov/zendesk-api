@@ -263,18 +263,19 @@ createUser (Name name) (Email email) = do
                 }
   userReplyUser `liftM` (runRequest request)
 
-getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
-getUsers = do
-  usersCollection <- lift $ runRequestTo =<< getUsersUrl
-  forM (collectionElements usersCollection) yield
-  getNextPage $ collectionNextPage usersCollection
 
-  where getNextPage :: (MonadIO m, MonadLogger m) => Maybe Text -> Source (ZendeskT m) User
-        getNextPage Nothing = return ()
-        getNextPage (Just url) = do
+getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
+getUsers =
+  go =<< (Just `liftM` (T.pack `liftM` (lift getUsersUrl)))
+
+  where go :: (MonadIO m, MonadLogger m)
+           => Maybe Text -> Source (ZendeskT m) User
+        go Nothing = return ()
+        go (Just url) = do
              usersCollection <- lift $ runRequestTo $ T.unpack url
              forM (collectionElements usersCollection) yield
-             getNextPage $ collectionNextPage usersCollection
+             go $ collectionNextPage usersCollection
+
 
 data None = None
   deriving (Show, Eq)
