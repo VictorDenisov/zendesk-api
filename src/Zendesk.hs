@@ -76,6 +76,11 @@ getUsersUrl = do
   baseUrl <- asks zendeskUrl
   return $ baseUrl ++ "/api/v2/users.json"
 
+getTicketsUrl :: Monad m => ZendeskT m String
+getTicketsUrl = do
+  baseUrl <- asks zendeskUrl
+  return $ baseUrl ++ "/api/v2/tickets.json"
+
 runZendeskT :: ZendeskConfig -> ZendeskT m a -> m (Either ZendeskError a)
 runZendeskT c f = runErrorT $ runReaderT f c
 
@@ -150,7 +155,7 @@ data Ticket = Ticket
 
 data Via = Via
   { viaChannel :: Text
-  , viaSource  :: Maybe Text -- actually it should be object. I don't known yet what object means
+  --, viaSource  :: Maybe Text -- actually it should be object. I don't known yet what object means
   } deriving (Show)
 
 data Collection e = Collection
@@ -318,6 +323,18 @@ getUsers =
              usersCollection <- lift $ runRequestTo $ T.unpack url
              forM (collectionElements usersCollection) yield
              go $ collectionNextPage usersCollection
+
+getTickets :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) Ticket
+getTickets =
+  go =<< (Just `liftM` (T.pack `liftM` (lift getTicketsUrl)))
+
+  where go :: (MonadIO m, MonadLogger m)
+           => Maybe Text -> Source (ZendeskT m) Ticket
+        go Nothing = return ()
+        go (Just url) = do
+          ticketsCollection <- lift $ runRequestTo $ T.unpack url
+          forM (collectionElements ticketsCollection) yield
+          go $ collectionNextPage ticketsCollection
 
 data None = None
   deriving (Show, Eq)
