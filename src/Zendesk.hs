@@ -21,7 +21,7 @@ import Control.Monad.Error (ErrorT (..), MonadError(..), Error(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Logger (MonadLogger(..), logDebug, runStdoutLoggingT)
 import Control.Monad.Trans (lift)
-import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..))
+import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..), Object)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as LBS (toStrict)
 import Data.ByteString.Char8 as BS8 (pack, unpack)
@@ -155,7 +155,7 @@ data Ticket = Ticket
 
 data Via = Via
   { viaChannel :: Text
-  --, viaSource  :: Maybe Text -- actually it should be object. I don't known yet what object means
+  , viaSource  :: Maybe Object
   } deriving (Show)
 
 data Collection e = Collection
