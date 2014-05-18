@@ -129,6 +129,29 @@ data Attachment = Attachment
   , attachmentThumbnails  :: Maybe [Attachment]
   } deriving (Show)
 
+data TicketField = TicketField
+  { ticketFieldId                  :: Maybe Int
+  , ticketFieldUrl                 :: Maybe Text
+  , ticketFieldType                :: Text
+  , ticketFieldTitle               :: Text
+  , ticketFieldDescription         :: Maybe Text
+  , ticketFieldPosition            :: Maybe Int
+  , ticketFieldActive              :: Maybe Bool
+  , ticketFieldRequired            :: Maybe Bool
+  , ticketFieldCollapsedForAgents  :: Maybe Text
+  , ticketFieldRegexpForValidation :: Maybe Text
+  , ticketFieldTitleInPortal       :: Maybe Text
+  , ticketFieldVisibleInPortal     :: Maybe Bool
+  , ticketFieldEditableInPortal    :: Maybe Bool
+  , ticketFieldRequiredInPortal    :: Maybe Bool
+  , ticketTag                      :: Maybe Text
+  , ticketCreatedAt                :: Maybe Text
+  , ticketUpdatedAt                :: Maybe Text
+  --, ticketSystemFieldOptions       :: Maybe [Text] TODO Array of something
+  --, ticketCustomFieldOptions       :: Maybe [Text] TODO Array of something
+  , ticketRemovable                :: Maybe Bool
+  } deriving (Show)
+
 data Ticket = Ticket
   { ticketId :: Maybe Int
   , ticketUrl :: Maybe Text
@@ -190,6 +213,7 @@ deriveJSON ''CreateUserRequest
 deriveJSON ''User
 deriveJSON ''Attachment
 deriveJSON ''Ticket
+deriveJSON ''TicketField
 deriveJSON ''Via
 
 showRequest :: Request -> String
