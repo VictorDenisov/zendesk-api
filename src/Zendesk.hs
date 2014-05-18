@@ -8,6 +8,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Zendesk
 where
@@ -188,16 +189,22 @@ data Collection e = Collection
   , collectionPrevPage :: Maybe Text
   } deriving Show
 
-instance (FromJSON e) => FromJSON (Collection e) where
-  parseJSON (Object v) = do
-    let k = head $ filter f $ M.keys v
+class CollectionKey e where
+  collectionKey :: e -> Text
+
+instance CollectionKey User where
+  collectionKey _ = "users"
+
+instance CollectionKey Ticket where
+  collectionKey _ = "tickets"
+
+instance (CollectionKey e, FromJSON e) => FromJSON (Collection e) where
+  parseJSON (Object v) =
     Collection
-          <$> v .: k
+          <$> v .: (collectionKey (undefined :: e))
           <*> v .: "count"
           <*> v .: "next_page"
           <*> v .: "previous_page"
-    where
-      f s = not $ s `elem` ["count", "next_page", "previous_page"]
 
 data UserReply = UserReply
   { userReplyUser :: User
@@ -338,27 +345,19 @@ createUser (Name name) (Email email) = do
 
 getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
 getUsers =
-  go =<< (Just `liftM` (T.pack `liftM` (lift getUsersUrl)))
-
-  where go :: (MonadIO m, MonadLogger m)
-           => Maybe Text -> Source (ZendeskT m) User
-        go Nothing = return ()
-        go (Just url) = do
-             usersCollection <- lift $ runRequestTo $ T.unpack url
-             forM (collectionElements usersCollection) yield
-             go $ collectionNextPage usersCollection
+  getCollection =<< (Just `liftM` (T.pack `liftM` (lift getUsersUrl)))
 
 getTickets :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) Ticket
 getTickets =
-  go =<< (Just `liftM` (T.pack `liftM` (lift getTicketsUrl)))
+  getCollection =<< (Just `liftM` (T.pack `liftM` (lift getTicketsUrl)))
 
-  where go :: (MonadIO m, MonadLogger m)
-           => Maybe Text -> Source (ZendeskT m) Ticket
-        go Nothing = return ()
-        go (Just url) = do
-          ticketsCollection <- lift $ runRequestTo $ T.unpack url
-          forM (collectionElements ticketsCollection) yield
-          go $ collectionNextPage ticketsCollection
+getCollection :: (CollectionKey e, MonadIO m, MonadLogger m, FromJSON e)
+              => Maybe Text -> Source (ZendeskT m) e
+getCollection Nothing = return ()
+getCollection (Just url) = do
+  collection <- lift $ runRequestTo $ T.unpack url
+  forM (collectionElements collection) yield
+  getCollection $ collectionNextPage collection
 
 data None = None
   deriving (Show, Eq)
