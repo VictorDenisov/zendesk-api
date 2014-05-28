@@ -153,6 +153,11 @@ data TicketField = TicketField
   , ticketRemovable                :: Maybe Bool
   } deriving (Show)
 
+data TicketFieldValue = TicketFieldValue
+  { ticketFieldValueId    :: Int
+  , ticketFieldValueValue :: Maybe Text
+  } deriving (Show)
+
 data Ticket = Ticket
   { ticketId :: Maybe Int
   , ticketUrl :: Maybe Text
@@ -175,6 +180,7 @@ data Ticket = Ticket
   , ticketDueAt :: Maybe Text
   , ticketTags :: Maybe [Text]
   , ticketVia :: Maybe Via
+  , ticketCustomFields :: Maybe [TicketFieldValue]
   } deriving (Show)
 
 data Via = Via
@@ -221,6 +227,7 @@ deriveJSON ''User
 deriveJSON ''Attachment
 deriveJSON ''Ticket
 deriveJSON ''TicketField
+deriveJSON ''TicketFieldValue
 deriveJSON ''Via
 
 showRequest :: Request -> String
