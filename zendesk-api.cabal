@@ -34,6 +34,7 @@ library
                      , pem == 0.2.*
                      , text >= 0.11.3
                      , template-haskell == 2.8.0.0
+                     , time == 1.4.0.1
                      , tls == 1.2.*
                      , transformers == 0.3.0.0
                      , unordered-containers == 0.2.*

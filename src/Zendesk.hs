@@ -34,6 +34,7 @@ import Data.Maybe (fromJust)
 import Data.PEM (PEM(..), pemParseBS)
 import Data.Text as T (pack, Text, unpack)
 import Data.Text.Encoding as T (encodeUtf8)
+import Data.Time.Clock (UTCTime(..))
 import Data.Traversable (Traversable(..))
 import Data.X509 (HashALG(..), decodeSignedCertificate)
 import Data.X509.CertificateStore (CertificateStore, makeCertificateStore)
@@ -145,12 +146,12 @@ data TicketField = TicketField
   , ticketFieldVisibleInPortal     :: Maybe Bool
   , ticketFieldEditableInPortal    :: Maybe Bool
   , ticketFieldRequiredInPortal    :: Maybe Bool
-  , ticketTag                      :: Maybe Text
-  , ticketCreatedAt                :: Maybe Text
-  , ticketUpdatedAt                :: Maybe Text
+  , ticketFieldTag                 :: Maybe Text
+  , ticketFieldCreatedAt           :: Maybe Text
+  , ticketFieldUpdatedAt           :: Maybe Text
   --, ticketSystemFieldOptions       :: Maybe [Text] TODO Array of something
   --, ticketCustomFieldOptions       :: Maybe [Text] TODO Array of something
-  , ticketRemovable                :: Maybe Bool
+  , ticketFieldRemovable           :: Maybe Bool
   } deriving (Show)
 
 data TicketFieldValue = TicketFieldValue
@@ -181,6 +182,13 @@ data Ticket = Ticket
   , ticketTags :: Maybe [Text]
   , ticketVia :: Maybe Via
   , ticketCustomFields :: Maybe [TicketFieldValue]
+  , ticketSatisfactionRaiting :: Maybe Object
+  , ticketSharingAgreementIds :: Maybe [Int]
+  , ticketFollowupIds :: Maybe [Int]
+  , ticketTicketFormId :: Maybe Int
+  , ticketBrandId :: Maybe Int
+  , ticketCreatedAt :: Maybe UTCTime
+  , ticketUpdatedAt :: Maybe UTCTime
   } deriving (Show)
 
 data Via = Via
