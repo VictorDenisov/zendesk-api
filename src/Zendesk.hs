@@ -108,8 +108,8 @@ data User = User
   { userId              :: Maybe Int
   , userUrl             :: Maybe Text
   , userName            :: Text
-  , userCreatedAt       :: Maybe Text
-  , userUpdatedAt       :: Maybe Text
+  , userCreatedAt       :: Maybe UTCTime
+  , userUpdatedAt       :: Maybe UTCTime
   , userTimeZone        :: Maybe Text
   , userEmail           :: Text
   , userPhone           :: Maybe Text
@@ -147,8 +147,8 @@ data TicketField = TicketField
   , ticketFieldEditableInPortal    :: Maybe Bool
   , ticketFieldRequiredInPortal    :: Maybe Bool
   , ticketFieldTag                 :: Maybe Text
-  , ticketFieldCreatedAt           :: Maybe Text
-  , ticketFieldUpdatedAt           :: Maybe Text
+  , ticketFieldCreatedAt           :: Maybe UTCTime
+  , ticketFieldUpdatedAt           :: Maybe UTCTime
   --, ticketSystemFieldOptions       :: Maybe [Text] TODO Array of something
   --, ticketCustomFieldOptions       :: Maybe [Text] TODO Array of something
   , ticketFieldRemovable           :: Maybe Bool
