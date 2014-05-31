@@ -83,6 +83,11 @@ getTicketsUrl = do
   baseUrl <- asks zendeskUrl
   return $ baseUrl ++ "/api/v2/tickets.json"
 
+getTicketFieldsUrl :: Monad m => ZendeskT m String
+getTicketFieldsUrl = do
+  baseUrl <- asks zendeskUrl
+  return $ baseUrl ++ "/api/v2/ticket_fields.json"
+
 runZendeskT :: ZendeskConfig -> ZendeskT m a -> m (Either ZendeskError a)
 runZendeskT c f = runErrorT $ runReaderT f c
 
@@ -140,7 +145,7 @@ data TicketField = TicketField
   , ticketFieldPosition            :: Maybe Int
   , ticketFieldActive              :: Maybe Bool
   , ticketFieldRequired            :: Maybe Bool
-  , ticketFieldCollapsedForAgents  :: Maybe Text
+  , ticketFieldCollapsedForAgents  :: Maybe Bool
   , ticketFieldRegexpForValidation :: Maybe Text
   , ticketFieldTitleInPortal       :: Maybe Text
   , ticketFieldVisibleInPortal     :: Maybe Bool
@@ -211,6 +216,9 @@ instance CollectionKey User where
 
 instance CollectionKey Ticket where
   collectionKey _ = "tickets"
+
+instance CollectionKey TicketField where
+  collectionKey _ = "ticket_fields"
 
 instance (CollectionKey e, FromJSON e) => FromJSON (Collection e) where
   parseJSON (Object v) =
@@ -365,6 +373,10 @@ getUsers =
 getTickets :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) Ticket
 getTickets =
   getCollection =<< (Just `liftM` (T.pack `liftM` (lift getTicketsUrl)))
+
+getTicketFields :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) TicketField
+getTicketFields =
+  getCollection =<< (Just `liftM` (T.pack `liftM` (lift getTicketFieldsUrl)))
 
 getCollection :: (CollectionKey e, MonadIO m, MonadLogger m, FromJSON e)
               => Maybe Text -> Source (ZendeskT m) e
