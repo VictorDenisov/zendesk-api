@@ -16,6 +16,8 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Zendesk
   other-modules:       Json
+                     , Zendesk.Common
+                     , Zendesk.User
   -- other-extensions:
   build-depends:       aeson == 0.7.*
                      , base >=4.5 && <4.7

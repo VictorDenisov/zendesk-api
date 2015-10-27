@@ -63,11 +63,7 @@ import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
 import Data.Conduit (Source, yield)
 
 import Zendesk.Common
-
-getUsersUrl :: Monad m => ZendeskT m String
-getUsersUrl = do
-  baseUrl <- asks zendeskUrl
-  return $ baseUrl ++ "/api/v2/users.json"
+import Zendesk.User
 
 getTicketsUrl :: Monad m => ZendeskT m String
 getTicketsUrl = do
@@ -79,36 +75,6 @@ getTicketFieldsUrl = do
   baseUrl <- asks zendeskUrl
   return $ baseUrl ++ "/api/v2/ticket_fields.json"
 
-newtype Name = Name String
-
-newtype Email = Email String
-
-data User = User
-  { userId              :: Maybe Int
-  , userUrl             :: Maybe Text
-  , userName            :: Text
-  , userCreatedAt       :: Maybe UTCTime
-  , userUpdatedAt       :: Maybe UTCTime
-  , userTimeZone        :: Maybe Text
-  , userEmail           :: Text
-  , userPhone           :: Maybe Text
-  , userLocale          :: Maybe Text
-  , userLocaleId        :: Maybe Int
-  , userOrganizationId  :: Maybe Int
-  , userRole            :: Text
-  , userVerified        :: Maybe Bool
-  , userPhoto           :: Maybe Attachment
-  } deriving (Show)
-
-
-data Attachment = Attachment
-  { attachmentId          :: Int
-  , attachmentFileName    :: Text
-  , attachmentContentUrl  :: Text
-  , attachmentContentType :: Text
-  , attachmentSize        :: Int
-  , attachmentThumbnails  :: Maybe [Attachment]
-  } deriving (Show)
 
 data TicketField = TicketField
   { ticketFieldId                  :: Maybe Int
@@ -175,47 +141,16 @@ data Via = Via
   , viaSource  :: Maybe Object
   } deriving (Show)
 
-instance CollectionKey User where
-  collectionKey _ = "users"
-
 instance CollectionKey Ticket where
   collectionKey _ = "tickets"
 
 instance CollectionKey TicketField where
   collectionKey _ = "ticket_fields"
 
-data UserReply = UserReply
-  { userReplyUser :: User
-  }
-
-data CreateUserRequest = CreateUserRequest
-  { createUserRequestName  :: String
-  , createUserRequestEmail :: String
-  } deriving (Show)
-
-deriveJSON ''UserReply
-deriveJSON ''CreateUserRequest
-deriveJSON ''User
-deriveJSON ''Attachment
 deriveJSON ''Ticket
 deriveJSON ''TicketField
 deriveJSON ''TicketFieldValue
 deriveJSON ''Via
-
-createUser :: (MonadIO m, MonadLogger m) => Name -> Email -> ZendeskT m User
-createUser (Name name) (Email email) = do
-  initRequest <- parseUrl =<< getUsersUrl
-  let request = initRequest
-                { method = "POST"
-                , requestHeaders = [ (mk "Content-Type", "application/json") ]
-                , requestBody = RequestBodyBS $ LBS.toStrict $ encode
-                                  $ object ["user" .= CreateUserRequest name email]
-                }
-  userReplyUser `liftM` (runRequest request)
-
-getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
-getUsers =
-  getCollection =<< (Just `liftM` (T.pack `liftM` (lift getUsersUrl)))
 
 getTickets :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) Ticket
 getTickets =
@@ -224,4 +159,3 @@ getTickets =
 getTicketFields :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) TicketField
 getTicketFields =
   getCollection =<< (Just `liftM` (T.pack `liftM` (lift getTicketFieldsUrl)))
-
