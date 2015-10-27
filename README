@@ -22,4 +22,4 @@ Prelude > :load ZendeskConfig.hs
 
 and you can invoke commands from interactive shell like this:
 
-rz $ listUsers
+l <- rz $ getUsers $$ CL.consume
