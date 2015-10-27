@@ -11,7 +11,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Zendesk
-where
+( runZendesk
+, createUser
+, getUsers
+, getTickets
+, getTicketFields
+, ZendeskConfig(..)
+, runZendeskT
+) where
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Exception (catches, SomeException(..), Handler(..))
@@ -20,7 +27,7 @@ import Control.Monad (liftM, forM)
 import Control.Monad.Reader (ReaderT (..), asks)
 import Control.Monad.Error (ErrorT (..), MonadError(..), Error(..))
 import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Logger (MonadLogger(..), logDebug, runStdoutLoggingT)
+import Control.Monad.Logger (MonadLogger(..), logDebug)
 import Control.Monad.Trans (lift)
 import Data.Aeson as J (eitherDecode, encode, FromJSON(..), withObject, withText, (.:), object, (.=), Value(..), Object)
 import Data.ByteString.Lazy (ByteString)
@@ -55,23 +62,7 @@ import Json (deriveJSON, deriveJSON_, deriveEnumJSON)
 
 import Data.Conduit (Source, yield)
 
-data ZendeskError = TimeoutError
-                  | NoResourceError
-                  | BadRequestError String
-                  | NoFreeServersError String
-                  | InternalError String
-                  | UnknownError String
-
-instance Error ZendeskError where
-  strMsg = UnknownError
-
-instance Show ZendeskError where
-  show NoResourceError   = "Resource not found in datacenter"
-  show TimeoutError      = "Datacenter unavailable"
-  show (BadRequestError s)      = "Bad request: " ++ s
-  show (NoFreeServersError s) = "Not enough free servers (" ++ s ++ ")"
-  show (InternalError s) = "Internal error: " ++ s
-  show (UnknownError s)  = s
+import Zendesk.Common
 
 getUsersUrl :: Monad m => ZendeskT m String
 getUsersUrl = do
@@ -87,23 +78,6 @@ getTicketFieldsUrl :: Monad m => ZendeskT m String
 getTicketFieldsUrl = do
   baseUrl <- asks zendeskUrl
   return $ baseUrl ++ "/api/v2/ticket_fields.json"
-
-runZendeskT :: ZendeskConfig -> ZendeskT m a -> m (Either ZendeskError a)
-runZendeskT c f = runErrorT $ runReaderT f c
-
-type ZendeskT m = ReaderT ZendeskConfig (ErrorT ZendeskError m)
-
-data ZendeskConfig = ZendeskConfig
-  { zendeskUrl :: String -- zendesk domain url
-  , zendeskUsername :: String
-  , zendeskPassword :: String
-  , zendeskTLS :: Maybe ZendeskTLSConfig
-  }
-
-data ZendeskTLSConfig = ZendeskTLSConfig
-  { tlsCredential :: Credential
-  , tlsCertificateStore :: CertificateStore
-  }
 
 newtype Name = Name String
 
@@ -201,16 +175,6 @@ data Via = Via
   , viaSource  :: Maybe Object
   } deriving (Show)
 
-data Collection e = Collection
-  { collectionElements :: [e]
-  , collectionCount    :: Int
-  , collectionNextPage :: Maybe Text
-  , collectionPrevPage :: Maybe Text
-  } deriving Show
-
-class CollectionKey e where
-  collectionKey :: e -> Text
-
 instance CollectionKey User where
   collectionKey _ = "users"
 
@@ -219,14 +183,6 @@ instance CollectionKey Ticket where
 
 instance CollectionKey TicketField where
   collectionKey _ = "ticket_fields"
-
-instance (CollectionKey e, FromJSON e) => FromJSON (Collection e) where
-  parseJSON (Object v) =
-    Collection
-          <$> v .: (collectionKey (undefined :: e))
-          <*> v .: "count"
-          <*> v .: "next_page"
-          <*> v .: "previous_page"
 
 data UserReply = UserReply
   { userReplyUser :: User
@@ -246,114 +202,6 @@ deriveJSON ''TicketField
 deriveJSON ''TicketFieldValue
 deriveJSON ''Via
 
-showRequest :: Request -> String
-showRequest x = unlines
-  [ "Request {"
-  , "  method = " ++ show (method x)
-  , "  url = \"" ++ show (getUri x) ++ "\""
-  , "  headers = " ++ show (requestHeaders x)
-  -- , "  body = " ++ show (requestBody x)
-  , "}"
-  ]
-
-showResponse :: Response ByteString -> String
-showResponse x = unlines
-  [ "Response {"
-  , "  status = " ++ show (statusCode $ responseStatus x)
-  , "  headers = " ++ show (responseHeaders x)
-  , "  body = " ++ show (responseBody x)
-  , "}"
-  ]
-
-errorResponseText :: HTTP.Response ByteString -> String
-errorResponseText response =
-  either (\_ -> show $ responseBody response) errorReportError $ eitherDecode . responseBody $ response
-
-handleExceptionsAndResult :: MonadIO m => IO a -> ZendeskT m a
-handleExceptionsAndResult monad = do
-  res <- liftIO $ (fmap Right monad) `catches` [ Handler handleHttpException
-                                               , Handler handleOtherExceptions
-                                               ]
-  case res of
-    Left v -> throwError v
-    Right x -> return x
-
-decodeResponseBody :: (Monad m, ParseResponseBody a)
-                   => Response ByteString -> m (Either ZendeskError a)
-decodeResponseBody response
-  | statusCode (responseStatus response) `elem` [200..299] =
-    case parseBody . responseBody $ response of
-      Left e -> return $ Left $ InternalError $ "Json parse error: " ++ e
-      Right x -> return $ Right x
-  | statusCode (responseStatus response) == 404 = return $ Left NoResourceError
-  | statusCode (responseStatus response) == 400 = return $ Left $ BadRequestError $ errorResponseText response
-  | statusCode (responseStatus response) == 402 = return $ Left $ NoFreeServersError $ errorResponseText response
-  | statusCode (responseStatus response) == 502 = return $ Left $ TimeoutError
-  | statusCode (responseStatus response) `elem` [500..599] = return $ Left $ InternalError $ errorResponseText response
-  | otherwise = return $ Left $ UnknownError $ errorResponseText response
-
-handleHttpException :: HttpException -> IO (Either ZendeskError a)
-handleHttpException ResponseTimeout = return $ Left TimeoutError
-handleHttpException e               = return $ Left $ UnknownError $ show e
-
-handleOtherExceptions :: SomeException -> IO (Either ZendeskError a)
-handleOtherExceptions e = return $ Left $ UnknownError $ show e
-
-
-runRequest :: (MonadIO m, MonadLogger m, ParseResponseBody a)
-           => Request -> ZendeskT m a
-runRequest request = do
-  username <- BS8.pack `liftM` (asks zendeskUsername)
-  password <- BS8.pack `liftM` (asks zendeskPassword)
-  let request' = applyBasicAuth username password $ request { checkStatus = \_ _ _ -> Nothing }
-
-  $logDebug $ T.pack $ "Sending request to zendesk: " ++ (showRequest request')
-
-  mTLSConfig <- asks zendeskTLS
-  let tlsSettings = case mTLSConfig of
-                      Nothing -> def
-                      Just tlsConfig ->
-                        let params = defaultParamsClient (BS8.unpack $ host request') ""
-                            validationChecks = defaultChecks
-                                                 { checkCAConstraints = False
-                                                 , checkLeafV3 = False
-                                                 , checkFQHN = False
-                                                 }
-                         in TLSSettings $ params
-                              { clientShared = (clientShared params)
-                                                 { sharedCredentials = Credentials [tlsCredential tlsConfig]
-                                                 , sharedCAStore = tlsCertificateStore tlsConfig
-                                                 }
-                              , clientHooks = def { onCertificateRequest = \_ -> return . Just $ tlsCredential tlsConfig
-                                                  , onServerCertificate = validate HashSHA256 defaultHooks validationChecks
-                                                  }
-                              , clientSupported = (clientSupported params)
-                                                    { supportedCiphers = ciphersuite_strong }
-                              }
-
-
-  let httpSettings = mkManagerSettings tlsSettings Nothing
-
-  response <- handleExceptionsAndResult $ do
-    withManagerSettings httpSettings $ httpLbs request'
-
-  $logDebug $ T.pack $ "Got response from zendesk: " ++ (showResponse response)
-
-  result <- decodeResponseBody response
-  case result of
-    Left v -> throwError v
-    Right x -> return x
-
-instance Monad m => Failure HttpException (ZendeskT m) where
-  failure e = throwError $ InternalError $ show e
-
-class Monad m => MonadZendesk m where
-  runZendesk :: ZendeskT m a -> m (Either ZendeskError a)
-
-runRequestTo :: (MonadIO m, MonadLogger m, ParseResponseBody a)
-             => String -> ZendeskT m a
-runRequestTo url = parseUrl url >>= runRequest
-
 createUser :: (MonadIO m, MonadLogger m) => Name -> Email -> ZendeskT m User
 createUser (Name name) (Email email) = do
   initRequest <- parseUrl =<< getUsersUrl
@@ -364,7 +212,6 @@ createUser (Name name) (Email email) = do
                                   $ object ["user" .= CreateUserRequest name email]
                 }
   userReplyUser `liftM` (runRequest request)
-
 
 getUsers :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) User
 getUsers =
@@ -378,27 +225,3 @@ getTicketFields :: (MonadIO m, MonadLogger m) => Source (ZendeskT m) TicketField
 getTicketFields =
   getCollection =<< (Just `liftM` (T.pack `liftM` (lift getTicketFieldsUrl)))
 
-getCollection :: (CollectionKey e, MonadIO m, MonadLogger m, FromJSON e)
-              => Maybe Text -> Source (ZendeskT m) e
-getCollection Nothing = return ()
-getCollection (Just url) = do
-  collection <- lift $ runRequestTo $ T.unpack url
-  forM (collectionElements collection) yield
-  getCollection $ collectionNextPage collection
-
-data None = None
-  deriving (Show, Eq)
-
-class ParseResponseBody a where
-  parseBody :: ByteString -> Either String a
-
-instance ParseResponseBody None where
-  parseBody _ = Right $ None
-
-instance FromJSON a => ParseResponseBody a where
-  parseBody = eitherDecode
-
-data ErrorReport = ErrorReport { errorReportError :: String }
-  deriving Show
-
-deriveJSON ''ErrorReport
