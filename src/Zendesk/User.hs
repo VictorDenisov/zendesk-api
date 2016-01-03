@@ -33,12 +33,12 @@ data User = User
   , userCreatedAt       :: Maybe UTCTime
   , userUpdatedAt       :: Maybe UTCTime
   , userTimeZone        :: Maybe Text
-  , userEmail           :: Text
+  , userEmail           :: Maybe Text
   , userPhone           :: Maybe Text
   , userLocale          :: Maybe Text
   , userLocaleId        :: Maybe Int
   , userOrganizationId  :: Maybe Int
-  , userRole            :: Text
+  , userRole            :: Maybe Text
   , userVerified        :: Maybe Bool
   , userPhoto           :: Maybe Attachment
   } deriving (Show)
